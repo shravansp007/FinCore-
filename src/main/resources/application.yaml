@@ -1,0 +1,58 @@
+server:
+  port: 8080
+
+spring:
+  application:
+    name: FinCore
+
+  # Exclude Redis by default so app runs without Redis; remove this to use Redis caching
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+
+  datasource:
+    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:banking_db}
+    username: ${POSTGRES_USER:postgres}
+    password: ${POSTGRES_PASSWORD}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+
+  data:
+    redis:
+      host: ${REDIS_HOST:localhost}
+      port: ${REDIS_PORT:6379}
+      timeout: 60000
+
+jwt:
+  secret: ${JWT_SECRET}
+  expiration: ${JWT_EXPIRATION:86400000}
+  issuer: ${JWT_ISSUER:banking-app}
+  audience: ${JWT_AUDIENCE:banking-app-clients}
+  clock-skew-seconds: ${JWT_CLOCK_SKEW_SECONDS:60}
+
+# Optional: seed one ADMIN user on startup when no admin exists (set app.admin.seed-enabled=true)
+app:
+  admin:
+    seed-enabled: false
+    seed-email: ${ADMIN_SEED_EMAIL:}
+    seed-password: ${ADMIN_SEED_PASSWORD:}
+  cors:
+    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
+  password-reset:
+    token-ttl-minutes: 15
+    dev-mode: false
+  payments:
+    min-amount: 1.00
+    max-amount: 100000.00
+
+logging:
+  level:
+    com.bank.app: INFO
