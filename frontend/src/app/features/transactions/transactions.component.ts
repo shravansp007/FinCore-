@@ -131,7 +131,7 @@ import { Account } from '../../shared/models/account.model';
                   <td>{{ tx.sourceAccountNumber ? '****' + tx.sourceAccountNumber.slice(-4) : '-' }}</td>
                   <td>{{ tx.destinationAccountNumber ? '****' + tx.destinationAccountNumber.slice(-4) : '-' }}</td>
                   <td class="amount" [ngClass]="{'credit': isCredit(tx), 'debit': isDebit(tx)}">
-                    {{ getAmountSign(tx) }}???{{ tx.amount | number:'1.2-2' }}
+                    {{ getAmountSign(tx) }}₹{{ tx.amount | number:'1.2-2' }}
                   </td>
                   <td>
                     <span class="tx-status" [ngClass]="tx.status.toLowerCase()">

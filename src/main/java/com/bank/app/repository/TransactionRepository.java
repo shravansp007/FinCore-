@@ -38,8 +38,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             LEFT JOIN t.sourceAccount sa
             LEFT JOIN t.destinationAccount da
             WHERE (sa.user.id = :userId OR da.user.id = :userId)
-              AND (:startDate IS NULL OR t.transactionDate >= cast(:startDate as timestamp))
-              AND (:endDate IS NULL OR t.transactionDate <= cast(:endDate as timestamp))
+              AND t.transactionDate >= :startDate
+              AND t.transactionDate <= :endDate
               AND (
                 :direction IS NULL
                 OR (
@@ -77,8 +77,8 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
             LEFT JOIN t.sourceAccount sa
             LEFT JOIN t.destinationAccount da
             WHERE (sa.user.id = :userId OR da.user.id = :userId)
-              AND (:startDate IS NULL OR t.transactionDate >= cast(:startDate as timestamp))
-              AND (:endDate IS NULL OR t.transactionDate <= cast(:endDate as timestamp))
+              AND t.transactionDate >= :startDate
+              AND t.transactionDate <= :endDate
             """)
     List<Transaction> findByUserIdAndDateRange(
             @Param("userId") Long userId,

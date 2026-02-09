@@ -37,6 +37,7 @@ import com.lowagie.text.Phrase;
 import com.lowagie.text.pdf.PdfPCell;
 import com.lowagie.text.pdf.PdfPTable;
 import com.lowagie.text.pdf.PdfWriter;
+import com.lowagie.text.pdf.PdfContentByte;
 
 import java.math.BigDecimal;
 import java.time.LocalDate;
@@ -46,6 +47,7 @@ import java.util.List;
 import java.util.UUID;
 import java.util.stream.Collectors;
 import java.io.ByteArrayOutputStream;
+import java.awt.Color;
 
 @Service
 @Slf4j
@@ -331,8 +333,12 @@ public class TransactionService {
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
         String normalizedDirection = normalizeDirection(direction);
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59, 999_999_999) : null;
+        LocalDateTime startDateTime = startDate != null
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime endDateTime = endDate != null
+                ? endDate.atTime(23, 59, 59, 999_999_999)
+                : LocalDateTime.of(2999, 12, 31, 23, 59, 59);
 
         return transactionRepository.findByUserIdWithFilters(user.getId(), startDateTime, endDateTime, normalizedDirection, pageable)
                 .map(this::mapToResponse);
@@ -388,8 +394,12 @@ public class TransactionService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new UsernameNotFoundException("User not found"));
 
-        LocalDateTime startDateTime = startDate != null ? startDate.atStartOfDay() : null;
-        LocalDateTime endDateTime = endDate != null ? endDate.atTime(23, 59, 59, 999_999_999) : null;
+        LocalDateTime startDateTime = startDate != null
+                ? startDate.atStartOfDay()
+                : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime endDateTime = endDate != null
+                ? endDate.atTime(23, 59, 59, 999_999_999)
+                : LocalDateTime.of(2999, 12, 31, 23, 59, 59);
 
         List<Transaction> transactions = transactionRepository.findByUserIdAndDateRange(
                 user.getId(),
@@ -414,18 +424,27 @@ public class TransactionService {
     private byte[] buildStatementPdf(User user, List<Transaction> transactions, LocalDate startDate, LocalDate endDate) {
         try (ByteArrayOutputStream out = new ByteArrayOutputStream()) {
             Document document = new Document(PageSize.A4);
-            PdfWriter.getInstance(document, out);
+            PdfWriter writer = PdfWriter.getInstance(document, out);
             document.open();
 
-            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 16);
-            Font labelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 10);
-            Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 10);
+            Color brandBlue = new Color(26, 35, 126);
+            Color brandOrange = new Color(255, 111, 0);
+            Color headerGray = new Color(245, 247, 250);
+            Color textGray = new Color(80, 87, 96);
+
+            Font titleFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 18, brandBlue);
+            Font bankFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 14, brandBlue);
+            Font subtitleFont = FontFactory.getFont(FontFactory.HELVETICA, 9, textGray);
+            Font labelFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, brandBlue);
+            Font textFont = FontFactory.getFont(FontFactory.HELVETICA, 9, textGray);
+            Font tableHeaderFont = FontFactory.getFont(FontFactory.HELVETICA_BOLD, 9, Color.BLACK);
+
+            addBrandHeader(document, writer, bankFont, subtitleFont, brandBlue, brandOrange);
 
             Paragraph title = new Paragraph("Bank Statement", titleFont);
             title.setAlignment(Element.ALIGN_CENTER);
+            title.setSpacingAfter(10);
             document.add(title);
-
-            document.add(new Paragraph(" "));
 
             DateTimeFormatter dateFormatter = DateTimeFormatter.ofPattern("dd MMM yyyy");
             String rangeText = "All Dates";
@@ -435,35 +454,45 @@ public class TransactionService {
                 rangeText = start + " to " + end;
             }
 
-            document.add(new Paragraph("Customer: " + user.getFirstName() + " " + user.getLastName(), textFont));
-            document.add(new Paragraph("Date Range: " + rangeText, textFont));
-            document.add(new Paragraph("Total Transactions: " + transactions.size(), textFont));
-            document.add(new Paragraph(" "));
+            String statementAccount = resolveStatementAccountNumber(transactions);
+
+            PdfPTable summary = new PdfPTable(2);
+            summary.setWidthPercentage(100);
+            summary.setWidths(new float[]{1.5f, 1.0f});
+            summary.setSpacingAfter(10);
+            summary.addCell(makeCell("Customer: " + user.getFirstName() + " " + user.getLastName(), textFont, PdfPCell.NO_BORDER, Element.ALIGN_LEFT));
+            summary.addCell(makeCell("Date Range: " + rangeText, textFont, PdfPCell.NO_BORDER, Element.ALIGN_RIGHT));
+            summary.addCell(makeCell("Account Number: " + statementAccount, textFont, PdfPCell.NO_BORDER, Element.ALIGN_LEFT));
+            summary.addCell(makeCell("Total Transactions: " + transactions.size(), textFont, PdfPCell.NO_BORDER, Element.ALIGN_RIGHT));
+            summary.addCell(makeCell("Statement Generated: " + LocalDate.now().format(dateFormatter), textFont, PdfPCell.NO_BORDER, Element.ALIGN_RIGHT));
+            document.add(summary);
 
             PdfPTable table = new PdfPTable(7);
             table.setWidthPercentage(100);
             table.setWidths(new float[]{2.2f, 1.5f, 1.4f, 2.0f, 2.0f, 1.5f, 2.0f});
 
-            addHeaderCell(table, "Date", labelFont);
-            addHeaderCell(table, "Type", labelFont);
-            addHeaderCell(table, "Amount", labelFont);
-            addHeaderCell(table, "From", labelFont);
-            addHeaderCell(table, "To", labelFont);
-            addHeaderCell(table, "Status", labelFont);
-            addHeaderCell(table, "Reference", labelFont);
+            addHeaderCell(table, "Date", tableHeaderFont, headerGray);
+            addHeaderCell(table, "Type", tableHeaderFont, headerGray);
+            addHeaderCell(table, "Amount", tableHeaderFont, headerGray);
+            addHeaderCell(table, "From", tableHeaderFont, headerGray);
+            addHeaderCell(table, "To", tableHeaderFont, headerGray);
+            addHeaderCell(table, "Status", tableHeaderFont, headerGray);
+            addHeaderCell(table, "Reference", tableHeaderFont, headerGray);
 
             DateTimeFormatter dtf = DateTimeFormatter.ofPattern("dd MMM yyyy HH:mm");
             for (Transaction tx : transactions) {
-                table.addCell(new PdfPCell(new Phrase(tx.getTransactionDate().format(dtf), textFont)));
-                table.addCell(new PdfPCell(new Phrase(tx.getType().name(), textFont)));
-                table.addCell(new PdfPCell(new Phrase(tx.getAmount().toPlainString(), textFont)));
-                table.addCell(new PdfPCell(new Phrase(maskAccount(tx.getSourceAccount()), textFont)));
-                table.addCell(new PdfPCell(new Phrase(maskAccount(tx.getDestinationAccount()), textFont)));
-                table.addCell(new PdfPCell(new Phrase(tx.getStatus().name(), textFont)));
-                table.addCell(new PdfPCell(new Phrase(tx.getTransactionReference(), textFont)));
+                table.addCell(makeCell(tx.getTransactionDate().format(dtf), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
+                table.addCell(makeCell(tx.getType().name(), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
+                table.addCell(makeCell(tx.getAmount().toPlainString(), textFont, PdfPCell.BOX, Element.ALIGN_RIGHT));
+                table.addCell(makeCell(maskAccount(tx.getSourceAccount()), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
+                table.addCell(makeCell(maskAccount(tx.getDestinationAccount()), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
+                table.addCell(makeCell(tx.getStatus().name(), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
+                table.addCell(makeCell(tx.getTransactionReference(), textFont, PdfPCell.BOX, Element.ALIGN_LEFT));
             }
 
             document.add(table);
+            document.add(new Paragraph(" "));
+            addFooter(document, textFont, brandBlue, brandOrange);
             document.close();
             return out.toByteArray();
         } catch (DocumentException e) {
@@ -473,11 +502,116 @@ public class TransactionService {
         }
     }
 
-    private void addHeaderCell(PdfPTable table, String text, Font font) {
+    private void addHeaderCell(PdfPTable table, String text, Font font, Color bg) {
         PdfPCell cell = new PdfPCell(new Phrase(text, font));
         cell.setHorizontalAlignment(Element.ALIGN_LEFT);
         cell.setPadding(6);
+        cell.setBackgroundColor(bg);
         table.addCell(cell);
+    }
+
+    private PdfPCell makeCell(String text, Font font, int border, int align) {
+        PdfPCell cell = new PdfPCell(new Phrase(text, font));
+        cell.setBorder(border);
+        cell.setHorizontalAlignment(align);
+        cell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        cell.setPadding(6);
+        return cell;
+    }
+
+    private void addBrandHeader(Document document, PdfWriter writer, Font bankFont, Font subtitleFont, Color brandBlue, Color brandOrange) throws DocumentException {
+        PdfPTable header = new PdfPTable(2);
+        header.setWidthPercentage(100);
+        header.setWidths(new float[]{1.0f, 4.0f});
+        header.setSpacingAfter(4);
+
+        PdfPCell logoCell = new PdfPCell();
+        logoCell.setBorder(PdfPCell.NO_BORDER);
+        logoCell.setFixedHeight(52);
+        logoCell.setVerticalAlignment(Element.ALIGN_MIDDLE);
+        header.addCell(logoCell);
+
+        PdfPCell textCell = new PdfPCell();
+        textCell.setBorder(PdfPCell.NO_BORDER);
+        textCell.addElement(new Phrase("FinCore Bank", bankFont));
+        textCell.addElement(new Phrase("Secure • Simple • Smart Banking", subtitleFont));
+        header.addCell(textCell);
+
+        document.add(header);
+
+        PdfContentByte cb = writer.getDirectContent();
+        float contentWidth = document.getPageSize().getWidth() - document.leftMargin() - document.rightMargin();
+        float logoColWidth = contentWidth * (1.0f / (1.0f + 4.0f));
+        float logoSize = 34;
+        float logoX = document.leftMargin() + (logoColWidth - logoSize) / 2.0f;
+        float logoY = document.getPageSize().getHeight() - document.topMargin() - 38;
+        drawLogo(cb, logoX, logoY, brandBlue, brandOrange);
+
+        PdfContentByte lineCb = writer.getDirectContent();
+        float lineY = logoY - 18;
+        float lineStartX = document.leftMargin() + logoColWidth;
+        float lineEndX = document.getPageSize().getWidth() - document.rightMargin();
+        lineCb.setColorStroke(brandBlue);
+        lineCb.setLineWidth(1.5f);
+        lineCb.moveTo(lineStartX, lineY);
+        lineCb.lineTo(lineEndX, lineY);
+        lineCb.stroke();
+
+        Paragraph care = new Paragraph("Customer Care: +91 1800-123-456 • support@fincorebank.com", subtitleFont);
+        care.setAlignment(Element.ALIGN_LEFT);
+        care.setIndentationLeft(logoColWidth);
+        care.setSpacingBefore(2);
+        care.setSpacingAfter(8);
+        document.add(care);
+    }
+
+    private void drawLogo(PdfContentByte cb, float x, float y, Color brandBlue, Color brandOrange) {
+        float size = 34;
+        cb.setColorFill(brandBlue);
+        cb.roundRectangle(x, y - size, size, size, 8);
+        cb.fill();
+
+        cb.setColorFill(brandOrange);
+        float roofY = y - 12;
+        cb.moveTo(x + 6, roofY);
+        cb.lineTo(x + size / 2, y - 3);
+        cb.lineTo(x + size - 6, roofY);
+        cb.closePathFillStroke();
+
+        cb.rectangle(x + 7, roofY - 4, size - 14, 3);
+        cb.fill();
+
+        float colWidth = 3;
+        float gap = 3;
+        float baseY = y - size + 9;
+        float baseX = x + 9;
+        for (int i = 0; i < 3; i++) {
+            cb.rectangle(baseX + i * (colWidth + gap), baseY, colWidth, 14);
+            cb.fill();
+        }
+    }
+
+    private void addFooter(Document document, Font textFont, Color brandBlue, Color brandOrange) throws DocumentException {
+        Paragraph footer = new Paragraph(
+                "FinCore Bank • 42, MG Road, Bengaluru, KA 560001 • IFSC: FINC0000123\n" +
+                "This statement is computer generated and does not require a signature.",
+                textFont
+        );
+        footer.setAlignment(Element.ALIGN_CENTER);
+        footer.setSpacingBefore(6);
+        document.add(footer);
+    }
+
+    private String resolveStatementAccountNumber(List<Transaction> transactions) {
+        for (Transaction tx : transactions) {
+            if (tx.getSourceAccount() != null && tx.getSourceAccount().getAccountNumber() != null) {
+                return maskAccount(tx.getSourceAccount());
+            }
+            if (tx.getDestinationAccount() != null && tx.getDestinationAccount().getAccountNumber() != null) {
+                return maskAccount(tx.getDestinationAccount());
+            }
+        }
+        return "-";
     }
 
     private String maskAccount(Account account) {

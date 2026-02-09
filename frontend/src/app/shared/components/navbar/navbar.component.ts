@@ -13,7 +13,7 @@ import { Notification } from '../../models/notification.model';
     <nav class="navbar" *ngIf="authService.isLoggedIn()">
       <div class="nav-container">
         <a routerLink="/dashboard" class="nav-brand">
-          <i class="fas fa-landmark"></i>
+          <img src="assets/fin-core-logo.svg" alt="FinCore Bank" class="brand-logo">
           <span>FinCore</span>
         </a>
         
@@ -99,8 +99,10 @@ import { Notification } from '../../models/notification.model';
       color: white;
     }
 
-    .nav-brand i {
-      color: #818cf8;
+    .brand-logo {
+      width: 34px;
+      height: 34px;
+      display: inline-block;
     }
 
     .nav-links {
@@ -267,11 +269,16 @@ export class NavbarComponent implements OnInit {
   ) {}
 
   ngOnInit(): void {
-    this.refreshUnreadCount();
+    if (this.authService.isLoggedIn()) {
+      this.refreshUnreadCount();
+    }
   }
 
   toggleNotifications(event: MouseEvent): void {
     event.stopPropagation();
+    if (!this.authService.isLoggedIn()) {
+      return;
+    }
     this.showNotifications = !this.showNotifications;
     if (this.showNotifications) {
       this.loadNotifications();
@@ -284,6 +291,11 @@ export class NavbarComponent implements OnInit {
   }
 
   loadNotifications(): void {
+    if (!this.authService.isLoggedIn()) {
+      this.notifications = [];
+      this.unreadCount = 0;
+      return;
+    }
     this.notificationService.getNotifications(false).subscribe({
       next: (items) => this.notifications = items,
       error: () => {}
@@ -292,6 +304,10 @@ export class NavbarComponent implements OnInit {
   }
 
   refreshUnreadCount(): void {
+    if (!this.authService.isLoggedIn()) {
+      this.unreadCount = 0;
+      return;
+    }
     this.notificationService.getUnreadCount().subscribe({
       next: (count) => this.unreadCount = count,
       error: () => {}
