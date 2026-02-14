@@ -16,4 +16,9 @@ public class AuthResponse {
     private String lastName;
     private String role;
     private Long userId;
+
+    public AuthResponse(String token) {
+        this.token = token;
+    }
 }
+

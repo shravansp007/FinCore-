@@ -3,56 +3,39 @@ server:
 
 spring:
   application:
-    name: FinCore
-
-  # Exclude Redis by default so app runs without Redis; remove this to use Redis caching
-  autoconfigure:
-    exclude:
-      - org.springframework.boot.autoconfigure.data.redis.RedisAutoConfiguration
+    name: intelligent-banking-platform
 
   datasource:
-    url: jdbc:postgresql://${POSTGRES_HOST:localhost}:${POSTGRES_PORT:5432}/${POSTGRES_DB:banking_db}
-    username: ${POSTGRES_USER:postgres}
-    password: ${POSTGRES_PASSWORD}
+    url: jdbc:postgresql://localhost:5432/banking_db
+    username: postgres
+    password: [REDACTED_DB_PASSWORD]
     driver-class-name: org.postgresql.Driver
 
   jpa:
+    open-in-view: true
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     show-sql: false
     properties:
       hibernate:
-        dialect: org.hibernate.dialect.PostgreSQLDialect
         format_sql: true
 
-  data:
-    redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
-      timeout: 60000
+  redis:
+    host: localhost
+    port: 6379
+
+  cache:
+    type: redis
 
 jwt:
-  secret: ${JWT_SECRET}
-  expiration: ${JWT_EXPIRATION:86400000}
-  issuer: ${JWT_ISSUER:banking-app}
-  audience: ${JWT_AUDIENCE:banking-app-clients}
-  clock-skew-seconds: ${JWT_CLOCK_SKEW_SECONDS:60}
-
-# Optional: seed one ADMIN user on startup when no admin exists (set app.admin.seed-enabled=true)
-app:
-  admin:
-    seed-enabled: false
-    seed-email: ${ADMIN_SEED_EMAIL:}
-    seed-password: ${ADMIN_SEED_PASSWORD:}
-  cors:
-    allowed-origins: ${CORS_ALLOWED_ORIGINS:http://localhost:4200}
-  password-reset:
-    token-ttl-minutes: 15
-    dev-mode: false
-  payments:
-    min-amount: 1.00
-    max-amount: 100000.00
+  secret: "[REDACTED_JWT_SECRET]"
+  expiration: 3600000   # 1 hour in milliseconds
 
 logging:
   level:
-    com.bank.app: INFO
+    root: INFO
+    org.hibernate.SQL: WARN
+    org.hibernate.orm.jdbc.bind: WARN
+    org.hibernate.type.descriptor.sql.BasicBinder: WARN
+    org.springframework.data.redis: WARN
+    org.springframework.data.redis.repository.config: WARN

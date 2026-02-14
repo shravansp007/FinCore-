@@ -40,7 +40,7 @@ public class DashboardService {
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
         List<BeneficiaryDTO> beneficiaries = beneficiaryService.getMyBeneficiaries(userEmail);
 
-        List<Transaction> userTransactions = transactionRepository.findByUserId(user.getId());
+        List<Transaction> userTransactions = transactionRepository.findByUserAccounts(user.getId());
         YearMonth currentMonth = YearMonth.now();
         LocalDateTime monthStart = currentMonth.atDay(1).atStartOfDay();
         LocalDateTime monthEnd = currentMonth.atEndOfMonth().atTime(23, 59, 59);
@@ -87,7 +87,7 @@ public class DashboardService {
 
     private boolean isCreditTransaction(Transaction tx, Long userId) {
         if (tx.getType() == TransactionType.DEPOSIT) {
-            return tx.getSourceAccount() != null && tx.getSourceAccount().getUser().getId().equals(userId);
+            return tx.getDestinationAccount() != null && tx.getDestinationAccount().getUser().getId().equals(userId);
         }
         if (tx.getType() == TransactionType.TRANSFER) {
             return tx.getDestinationAccount() != null && tx.getDestinationAccount().getUser().getId().equals(userId);

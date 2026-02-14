@@ -3,10 +3,12 @@ package com.bank.app.service;
 import com.bank.app.dto.AccountDTO;
 import com.bank.app.dto.CreateAccountRequest;
 import com.bank.app.entity.Account;
+import com.bank.app.entity.Transaction;
 import com.bank.app.entity.User;
 import com.bank.app.exception.ResourceNotFoundException;
 import com.bank.app.exception.UnauthorizedException;
 import com.bank.app.repository.AccountRepository;
+import com.bank.app.repository.TransactionRepository;
 import com.bank.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -15,6 +17,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.time.LocalDateTime;
+import java.util.UUID;
 import java.util.List;
 import java.security.SecureRandom;
 import java.util.stream.Collectors;
@@ -26,6 +30,7 @@ public class AccountService {
 
     private final AccountRepository accountRepository;
     private final UserRepository userRepository;
+    private final TransactionRepository transactionRepository;
 
     @Transactional
     public AccountDTO createAccount(String userEmail, CreateAccountRequest request) {
@@ -47,6 +52,7 @@ public class AccountService {
                 .build();
 
         account = accountRepository.save(account);
+        createOpeningBalanceTransactionIfNeeded(user, account);
         log.info("action=account.create.success userId={} accountId={} accountType={} currency={}",
                 user.getId(), account.getId(), account.getAccountType(), account.getCurrency());
         return mapToDTO(account);
@@ -106,6 +112,26 @@ public class AccountService {
             return generateAccountNumber();
         }
         return accountNumber;
+    }
+
+    private void createOpeningBalanceTransactionIfNeeded(User user, Account account) {
+        BigDecimal openingBalance = account.getBalance();
+        if (openingBalance == null || openingBalance.compareTo(BigDecimal.ZERO) <= 0) {
+            return;
+        }
+
+        Transaction openingTx = Transaction.builder()
+                .transactionReference("OPEN-" + UUID.randomUUID().toString().replace("-", "").substring(0, 12).toUpperCase())
+                .type(Transaction.TransactionType.DEPOSIT)
+                .amount(openingBalance)
+                .description("Opening balance")
+                .destinationAccount(account)
+                .status(Transaction.TransactionStatus.COMPLETED)
+                .transactionDate(account.getCreatedAt() != null ? account.getCreatedAt() : LocalDateTime.now())
+                .user(user)
+                .build();
+
+        transactionRepository.save(openingTx);
     }
 
     private AccountDTO mapToDTO(Account account) {

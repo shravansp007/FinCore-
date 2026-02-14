@@ -1,5 +1,5 @@
 import { Injectable } from '@angular/core';
-import { HttpClient, HttpParams } from '@angular/common/http';
+import { HttpClient, HttpParams, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 import { environment } from '../../../environments/environment';
 import { Transaction, TransactionRequest } from '../../shared/models/transaction.model';
@@ -68,12 +68,13 @@ export class TransactionService {
     return this.http.get<PageResponse<Transaction>>(this.API_URL, { params: httpParams });
   }
 
-  downloadStatement(startDate?: string, endDate?: string): Observable<Blob> {
+  downloadStatement(startDate?: string, endDate?: string): Observable<HttpResponse<Blob>> {
     let httpParams = new HttpParams();
     if (startDate) httpParams = httpParams.set('startDate', startDate);
     if (endDate) httpParams = httpParams.set('endDate', endDate);
-    return this.http.get(`${this.API_URL}/statement`, {
+    return this.http.get(`${this.API_URL}/statement/download`, {
       params: httpParams,
+      observe: 'response',
       responseType: 'blob'
     });
   }

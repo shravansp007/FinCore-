@@ -7,6 +7,7 @@ import jakarta.validation.ConstraintViolationException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
+import org.springframework.orm.jpa.JpaSystemException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.AuthenticationException;
@@ -99,6 +100,21 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ResponseEntity<Map<String, Object>> handleTypeMismatch(MethodArgumentTypeMismatchException ex, HttpServletRequest request) {
         return buildErrorResponse("Invalid parameter: " + ex.getName(), HttpStatus.BAD_REQUEST, request, null);
+    }
+
+    @ExceptionHandler(JpaSystemException.class)
+    public ResponseEntity<Map<String, Object>> handleJpaSystemException(JpaSystemException ex, HttpServletRequest request) {
+        String message = ex.getMessage() != null ? ex.getMessage() : "";
+        if (message.contains("No enum constant") && message.contains("Transaction$TransactionType")) {
+            log.error("action=error.enum_mapping path={} message={}", request.getRequestURI(), message, ex);
+            return buildErrorResponse(
+                    "Transaction data contains an unsupported type. Please normalize transaction_type values in the database.",
+                    HttpStatus.INTERNAL_SERVER_ERROR,
+                    request,
+                    null
+            );
+        }
+        return buildErrorResponse("An unexpected database error occurred", HttpStatus.INTERNAL_SERVER_ERROR, request, null);
     }
 
     @ExceptionHandler(RuntimeException.class)

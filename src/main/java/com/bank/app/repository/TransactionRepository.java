@@ -1,88 +1,83 @@
 package com.bank.app.repository;
 
-import com.bank.app.entity.Account;
 import com.bank.app.entity.Transaction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
-import org.springframework.stereotype.Repository;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
-@Repository
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
-    
-    Optional<Transaction> findByTransactionReference(String transactionReference);
-    
-    @Query("SELECT t FROM Transaction t WHERE t.sourceAccount = :account OR t.destinationAccount = :account ORDER BY t.transactionDate DESC")
-    List<Transaction> findByAccount(@Param("account") Account account);
-    
-    @Query("SELECT t FROM Transaction t WHERE t.sourceAccount.id = :accountId OR t.destinationAccount.id = :accountId ORDER BY t.transactionDate DESC")
-    Page<Transaction> findByAccountId(@Param("accountId") Long accountId, Pageable pageable);
-    
-    @Query("""
-            SELECT t FROM Transaction t
-            LEFT JOIN t.sourceAccount sa
-            LEFT JOIN t.destinationAccount da
-            WHERE (sa.user.id = :userId OR da.user.id = :userId)
-            ORDER BY t.transactionDate DESC
-            """)
-    List<Transaction> findByUserId(@Param("userId") Long userId);
+
+    List<Transaction> findByUserId(Long userId);
+
+    Page<Transaction> findByUserId(Long userId, Pageable pageable);
+
+    Page<Transaction> findByUserIdAndTransactionDateBetween(Long userId, LocalDateTime start, LocalDateTime end, Pageable pageable);
 
     @Query("""
-            SELECT t FROM Transaction t
-            LEFT JOIN t.sourceAccount sa
-            LEFT JOIN t.destinationAccount da
-            WHERE (sa.user.id = :userId OR da.user.id = :userId)
-              AND t.transactionDate >= :startDate
-              AND t.transactionDate <= :endDate
-              AND (
-                :direction IS NULL
-                OR (
-                  :direction = 'CREDIT' AND (
-                    (t.type = com.bank.app.entity.Transaction$TransactionType.DEPOSIT AND sa.user.id = :userId)
-                    OR (t.type = com.bank.app.entity.Transaction$TransactionType.TRANSFER AND da.user.id = :userId)
-                  )
-                )
-                OR (
-                  :direction = 'DEBIT' AND (
-                    ((t.type = com.bank.app.entity.Transaction$TransactionType.WITHDRAWAL OR t.type = com.bank.app.entity.Transaction$TransactionType.PAYMENT)
-                      AND sa.user.id = :userId)
-                    OR (t.type = com.bank.app.entity.Transaction$TransactionType.TRANSFER AND sa.user.id = :userId)
-                  )
-                )
-              )
+            select distinct t
+            from Transaction t
+            left join t.sourceAccount sa
+            left join t.destinationAccount da
+            where sa.id = :accountId
+               or da.id = :accountId
             """)
-    Page<Transaction> findByUserIdWithFilters(
+    Page<Transaction> findByAccountId(@Param("accountId") Long accountId, Pageable pageable);
+
+    Optional<Transaction> findByTransactionReference(String transactionReference);
+
+    long countBySourceAccountIdOrDestinationAccountId(Long sourceAccountId, Long destinationAccountId);
+
+    @Query("""
+            select distinct t
+            from Transaction t
+            left join t.user u
+            left join t.sourceAccount sa
+            left join sa.user su
+            left join t.destinationAccount da
+            left join da.user du
+            where u.id = :userId
+               or su.id = :userId
+               or du.id = :userId
+            """)
+    Page<Transaction> findByUserAccounts(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("""
+            select distinct t
+            from Transaction t
+            left join t.user u
+            left join t.sourceAccount sa
+            left join sa.user su
+            left join t.destinationAccount da
+            left join da.user du
+            where (u.id = :userId
+               or su.id = :userId
+               or du.id = :userId)
+              and t.transactionDate between :start and :end
+            """)
+    Page<Transaction> findByUserAccountsAndTransactionDateBetween(
             @Param("userId") Long userId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate,
-            @Param("direction") String direction,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
             Pageable pageable
     );
-    
-    @Query("SELECT t FROM Transaction t WHERE t.transactionDate BETWEEN :startDate AND :endDate AND (t.sourceAccount = :account OR t.destinationAccount = :account)")
-    List<Transaction> findByAccountAndDateRange(
-            @Param("account") Account account,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
-    );
 
     @Query("""
-            SELECT t FROM Transaction t
-            LEFT JOIN t.sourceAccount sa
-            LEFT JOIN t.destinationAccount da
-            WHERE (sa.user.id = :userId OR da.user.id = :userId)
-              AND t.transactionDate >= :startDate
-              AND t.transactionDate <= :endDate
+            select distinct t
+            from Transaction t
+            left join t.user u
+            left join t.sourceAccount sa
+            left join sa.user su
+            left join t.destinationAccount da
+            left join da.user du
+            where u.id = :userId
+               or su.id = :userId
+               or du.id = :userId
             """)
-    List<Transaction> findByUserIdAndDateRange(
-            @Param("userId") Long userId,
-            @Param("startDate") LocalDateTime startDate,
-            @Param("endDate") LocalDateTime endDate
-    );
+    List<Transaction> findByUserAccounts(@Param("userId") Long userId);
 }

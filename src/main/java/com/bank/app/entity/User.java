@@ -1,14 +1,17 @@
 package com.bank.app.entity;
 
 import jakarta.persistence.*;
-import lombok.*;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;
 
-import java.time.LocalDateTime;
 import java.util.Collection;
 import java.util.List;
+import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "users")
@@ -22,23 +25,22 @@ public class User implements UserDetails {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String firstName;
 
-    @Column(nullable = false)
+    @Column(nullable = false, length = 100)
     private String lastName;
 
-    @Column(nullable = false, unique = true)
+    @Column(unique = true, nullable = false, length = 150)
     private String email;
 
     @Column(nullable = false)
     private String password;
 
-    @Column(unique = true)
+    @Column(length = 30)
     private String phoneNumber;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private Role role;
 
     @Column(nullable = false)
@@ -54,6 +56,12 @@ public class User implements UserDetails {
     protected void onCreate() {
         createdAt = LocalDateTime.now();
         updatedAt = LocalDateTime.now();
+        if (enabled == null) {
+            enabled = true;
+        }
+        if (role == null) {
+            role = Role.USER;
+        }
     }
 
     @PreUpdate
@@ -61,9 +69,16 @@ public class User implements UserDetails {
         updatedAt = LocalDateTime.now();
     }
 
+    // ========================
+    // Spring Security methods
+    // ========================
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority("ROLE_" + role.name()));
+        if (role == null) {
+            return List.of(new SimpleGrantedAuthority(Role.USER.name()));
+        }
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override
@@ -88,6 +103,6 @@ public class User implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return enabled;
+        return Boolean.TRUE.equals(enabled);
     }
 }

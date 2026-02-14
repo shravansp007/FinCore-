@@ -1179,14 +1179,26 @@ export class TransactionsComponent implements OnInit {
     this.errorMessage = '';
     this.successMessage = '';
     this.transactionService.downloadStatement(this.startDate || undefined, this.endDate || undefined).subscribe({
-      next: (blob) => {
+      next: (response) => {
+        const responseBlob = response.body;
+        if (!responseBlob || responseBlob.size === 0) {
+          this.loadingStatement = false;
+          this.errorMessage = 'Failed to download statement.';
+          return;
+        }
+        const blob = new Blob([responseBlob], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
         const link = document.createElement('a');
+        const contentDisposition = response.headers.get('content-disposition') || '';
+        const filenameMatch = contentDisposition.match(/filename\*?=(?:UTF-8''|\"?)([^\";]+)/i);
+        const serverFilename = filenameMatch ? decodeURIComponent(filenameMatch[1].replace(/\"/g, '').trim()) : '';
         const start = this.startDate ? this.startDate : 'all';
         const end = this.endDate ? this.endDate : 'all';
         link.href = url;
-        link.download = `bank-statement-${start}-to-${end}.pdf`;
+        link.download = serverFilename || `bank-statement-${start}-to-${end}.pdf`;
+        document.body.appendChild(link);
         link.click();
+        document.body.removeChild(link);
         window.URL.revokeObjectURL(url);
         this.loadingStatement = false;
         this.successMessage = 'Statement downloaded successfully.';

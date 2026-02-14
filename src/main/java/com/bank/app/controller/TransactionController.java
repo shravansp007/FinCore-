@@ -12,9 +12,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.format.annotation.DateTimeFormat.ISO;
 import org.springframework.data.web.PageableDefault;
-import org.springframework.http.ResponseEntity;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
@@ -90,17 +92,30 @@ public class TransactionController {
         return ResponseEntity.ok(transactionService.getTransactionByReference(reference, userDetails.getUsername()));
     }
 
-    @GetMapping("/statement")
+    @GetMapping("/statement/download")
     public ResponseEntity<byte[]> downloadStatement(
             @AuthenticationPrincipal UserDetails userDetails,
             @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate startDate,
             @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate endDate) {
-        byte[] pdf = transactionService.generateStatementPdf(userDetails.getUsername(), startDate, endDate);
+        byte[] pdfBytes = transactionService.generateStatementPdf(userDetails.getUsername(), startDate, endDate);
 
-        String filename = "bank-statement.pdf";
-        return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=" + filename)
-                .contentType(MediaType.APPLICATION_PDF)
-                .body(pdf);
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_PDF);
+        headers.setContentDisposition(
+                ContentDisposition.attachment()
+                        .filename("bank-statement.pdf")
+                        .build()
+        );
+        headers.setContentLength(pdfBytes.length);
+
+        return new ResponseEntity<>(pdfBytes, headers, HttpStatus.OK);
+    }
+
+    @GetMapping("/statement")
+    public ResponseEntity<byte[]> downloadStatementLegacy(
+            @AuthenticationPrincipal UserDetails userDetails,
+            @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate startDate,
+            @RequestParam(required = false) @DateTimeFormat(iso = ISO.DATE) LocalDate endDate) {
+        return downloadStatement(userDetails, startDate, endDate);
     }
 }
