@@ -8,7 +8,7 @@ spring:
   datasource:
     url: jdbc:postgresql://localhost:5432/banking_db
     username: postgres
-    password: [REDACTED_DB_PASSWORD]
+    password: ${DB_PASSWORD}
     driver-class-name: org.postgresql.Driver
 
   jpa:
@@ -99,7 +99,7 @@ management:
       endpoint: http://localhost:9411/api/v2/spans
 
 jwt:
-  secret: "[REDACTED_JWT_SECRET]"
+  secret: ${JWT_SECRET}
   expiration: 900000          # 15 minutes in milliseconds
   refresh-expiration: 604800000 # 7 days in milliseconds
 
