@@ -25,7 +25,11 @@ export class AuthService {
   }
 
   login(credentials: AuthRequest): Observable<AuthResponse> {
-    return this.http.post<AuthResponse>(`${this.API_URL}/login`, credentials);
+    const payload: AuthRequest = {
+      ...credentials,
+      email: credentials.email?.trim().toLowerCase() ?? ''
+    };
+    return this.http.post<AuthResponse>(`${this.API_URL}/login`, payload);
   }
 
   register(data: RegisterRequest): Observable<AuthResponse> {
@@ -33,7 +37,11 @@ export class AuthService {
   }
 
   forgotPassword(data: ForgotPasswordRequest): Observable<{ message: string; resetToken?: string }> {
-    return this.http.post<{ message: string; resetToken?: string }>(`${this.API_URL}/forgot-password`, data);
+    const payload: ForgotPasswordRequest = {
+      ...data,
+      email: data.email?.trim().toLowerCase() ?? ''
+    };
+    return this.http.post<{ message: string; resetToken?: string }>(`${this.API_URL}/forgot-password`, payload);
   }
 
   resetPassword(data: ResetPasswordRequest): Observable<{ message: string }> {

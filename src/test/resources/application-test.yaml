@@ -14,10 +14,24 @@ spring:
     properties:
       hibernate:
         dialect: org.hibernate.dialect.H2Dialect
+  batch:
+    job:
+      enabled: false
+    jdbc:
+      initialize-schema: never
+  kafka:
+    listener:
+      auto-startup: false
 
 jwt:
   secret: test-secret-change-me-please-32-bytes
   expiration: 86400000
+  refresh-expiration: 604800000
   issuer: test-issuer
   audience: test-audience
   clock-skew-seconds: 60
+
+security:
+  cookie:
+    secure: false
+  lockout-duration-minutes: 15

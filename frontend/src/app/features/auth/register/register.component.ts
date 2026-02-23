@@ -58,12 +58,14 @@ import { AuthService } from '../../../core/services/auth.service';
                   <i class="fas fa-user"></i> First Name
                 </label>
                 <input type="text" id="firstName" formControlName="firstName" placeholder="Enter first name">
+                <small class="field-error" *ngIf="isFieldInvalid('firstName')">First name is required</small>
               </div>
               <div class="form-group">
                 <label for="lastName">
                   <i class="fas fa-user"></i> Last Name
                 </label>
                 <input type="text" id="lastName" formControlName="lastName" placeholder="Enter last name">
+                <small class="field-error" *ngIf="isFieldInvalid('lastName')">Last name is required</small>
               </div>
             </div>
 
@@ -72,6 +74,9 @@ import { AuthService } from '../../../core/services/auth.service';
                 <i class="fas fa-envelope"></i> Email Address
               </label>
               <input type="email" id="email" formControlName="email" placeholder="Enter your email">
+              <small class="field-error" *ngIf="isFieldInvalid('email')">
+                {{ registerForm.get('email')?.hasError('email') ? 'Enter a valid email address' : 'Email is required' }}
+              </small>
             </div>
 
             <div class="form-group">
@@ -95,6 +100,9 @@ import { AuthService } from '../../../core/services/auth.service';
                   <i [class]="showPassword ? 'fas fa-eye-slash' : 'fas fa-eye'"></i>
                 </button>
               </div>
+              <small class="field-error" *ngIf="isFieldInvalid('password')">
+                {{ registerForm.get('password')?.hasError('minlength') ? 'Password must be at least 6 characters' : 'Password is required' }}
+              </small>
               <div class="password-strength" *ngIf="registerForm.get('password')?.value">
                 <div class="strength-bar" [style.width]="getPasswordStrength() + '%'" 
                      [style.background]="getPasswordStrengthColor()"></div>
@@ -102,18 +110,19 @@ import { AuthService } from '../../../core/services/auth.service';
             </div>
 
             <div class="terms-checkbox">
-              <input type="checkbox" id="terms" required>
+              <input type="checkbox" id="terms" formControlName="termsAccepted">
               <label for="terms">
                 I agree to the <a href="#">Terms & Conditions</a> and <a href="#">Privacy Policy</a>
               </label>
             </div>
+            <small class="field-error" *ngIf="isFieldInvalid('termsAccepted')">You must accept terms to continue</small>
 
             <div class="alert alert-error" *ngIf="errorMessage">
               <i class="fas fa-exclamation-triangle"></i>
               {{ errorMessage }}
             </div>
 
-            <button type="submit" class="btn btn-orange btn-block" [disabled]="loading">
+            <button type="submit" class="btn btn-orange btn-block" [disabled]="loading || registerForm.invalid">
               <span *ngIf="!loading">
                 <i class="fas fa-user-plus"></i> Create Account
               </span>
@@ -353,6 +362,13 @@ import { AuthService } from '../../../core/services/auth.service';
       overflow: hidden;
     }
 
+    .field-error {
+      display: block;
+      margin-top: 6px;
+      color: #c62828;
+      font-size: 12px;
+    }
+
     .strength-bar {
       height: 100%;
       transition: all 0.3s;
@@ -447,8 +463,14 @@ export class RegisterComponent {
       lastName: ['', Validators.required],
       email: ['', [Validators.required, Validators.email]],
       phoneNumber: [''],
-      password: ['', [Validators.required, Validators.minLength(6)]]
+      password: ['', [Validators.required, Validators.minLength(6)]],
+      termsAccepted: [false, Validators.requiredTrue]
     });
+  }
+
+  isFieldInvalid(fieldName: string): boolean {
+    const field = this.registerForm.get(fieldName);
+    return !!field && field.invalid && (field.touched || field.dirty);
   }
 
   getPasswordStrength(): number {
@@ -472,13 +494,14 @@ export class RegisterComponent {
   onSubmit(): void {
     if (this.registerForm.invalid) {
       this.registerForm.markAllAsTouched();
+      this.errorMessage = 'Please complete all required fields.';
       return;
     }
 
     this.loading = true;
     this.errorMessage = '';
-
-    this.authService.register(this.registerForm.value).subscribe({
+    const { termsAccepted, ...payload } = this.registerForm.value;
+    this.authService.register(payload).subscribe({
       next: (res) => {
         this.authService.persistAuthResponse(res);
         this.router.navigate(['/dashboard']);

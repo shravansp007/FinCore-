@@ -40,10 +40,18 @@ public class Account {
     @Builder.Default
     private Boolean active = true;
 
+    @Enumerated(EnumType.STRING)
+    @Column(nullable = false, length = 20)
+    @Builder.Default
+    private AccountStatus accountStatus = AccountStatus.ACTIVE;
+
     @Column(nullable = false, updatable = false)
     private LocalDateTime createdAt;
 
     private LocalDateTime updatedAt;
+
+    @Version
+    private Long version;
 
     @PrePersist
     protected void onCreate() {
@@ -51,6 +59,9 @@ public class Account {
         updatedAt = LocalDateTime.now();
         if (balance == null) {
             balance = BigDecimal.ZERO;
+        }
+        if (accountStatus == null) {
+            accountStatus = AccountStatus.ACTIVE;
         }
     }
 
@@ -63,5 +74,10 @@ public class Account {
         SAVINGS,
         CHECKING,
         FIXED_DEPOSIT
+    }
+
+    public enum AccountStatus {
+        ACTIVE,
+        DORMANT
     }
 }

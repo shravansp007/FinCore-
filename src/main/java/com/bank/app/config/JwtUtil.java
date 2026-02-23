@@ -12,6 +12,8 @@ import org.springframework.stereotype.Component;
 import java.nio.charset.StandardCharsets;
 import javax.crypto.SecretKey;
 import java.util.Date;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.function.Function;
 
 @Component
@@ -23,16 +25,36 @@ public class JwtUtil {
     @Value("${jwt.expiration}")
     private long jwtExpiration;
 
+    @Value("${jwt.refresh-expiration}")
+    private long refreshExpiration;
+
     // ========================
     // Generate JWT Token
     // ========================
     public String generateToken(UserDetails userDetails) {
+        return generateAccessToken(userDetails);
+    }
+
+    public String generateAccessToken(UserDetails userDetails) {
         return Jwts.builder()
                 .setSubject(userDetails.getUsername())
                 .setIssuedAt(new Date(System.currentTimeMillis()))
                 .setExpiration(
                         new Date(System.currentTimeMillis() + jwtExpiration)
                 )
+                .signWith(getSigningKey())
+                .compact();
+    }
+
+    public String generateRefreshToken(UserDetails userDetails, String sessionId) {
+        Map<String, Object> claims = new HashMap<>();
+        claims.put("type", "refresh");
+        claims.put("sid", sessionId);
+        return Jwts.builder()
+                .claims(claims)
+                .subject(userDetails.getUsername())
+                .issuedAt(new Date(System.currentTimeMillis()))
+                .expiration(new Date(System.currentTimeMillis() + refreshExpiration))
                 .signWith(getSigningKey())
                 .compact();
     }
@@ -59,6 +81,11 @@ public class JwtUtil {
     public <T> T extractClaim(String token, Function<Claims, T> claimsResolver) {
         final Claims claims = extractAllClaims(token);
         return claimsResolver.apply(claims);
+    }
+
+    public Map<String, Object> extractAllClaimsAsMap(String token) {
+        Claims claims = extractAllClaims(token);
+        return new HashMap<>(claims);
     }
 
     // ========================

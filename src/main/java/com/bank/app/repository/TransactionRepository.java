@@ -7,9 +7,11 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.math.BigDecimal;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Stream;
 
 public interface TransactionRepository extends JpaRepository<Transaction, Long> {
 
@@ -80,4 +82,56 @@ public interface TransactionRepository extends JpaRepository<Transaction, Long> 
                or du.id = :userId
             """)
     List<Transaction> findByUserAccounts(@Param("userId") Long userId);
+
+    @Query("""
+            select t
+            from Transaction t
+            where (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
+              and t.transactionDate between :start and :end
+              and t.status = com.bank.app.entity.Transaction$TransactionStatus.COMPLETED
+            order by t.transactionDate asc, t.id asc
+            """)
+    Stream<Transaction> streamByAccountAndTransactionDateBetween(
+            @Param("accountId") Long accountId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+            select coalesce(sum(
+                case
+                    when t.destinationAccount.id = :accountId then t.amount
+                    when t.sourceAccount.id = :accountId then -t.amount
+                    else 0
+                end
+            ), 0)
+            from Transaction t
+            where (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
+              and t.transactionDate between :start and :end
+              and t.status = com.bank.app.entity.Transaction$TransactionStatus.COMPLETED
+            """)
+    BigDecimal calculateNetChangeForAccountBetween(
+            @Param("accountId") Long accountId,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end
+    );
+
+    @Query("""
+            select count(t)
+            from Transaction t
+            where (t.sourceAccount.id = :accountId or t.destinationAccount.id = :accountId)
+              and t.transactionDate >= :since
+            """)
+    long countTransactionsForAccountSince(
+            @Param("accountId") Long accountId,
+            @Param("since") LocalDateTime since
+    );
+
+    Page<Transaction> findByStatusAndTransactionDateBefore(
+            Transaction.TransactionStatus status,
+            LocalDateTime before,
+            Pageable pageable
+    );
+
+    Page<Transaction> findByStatus(Transaction.TransactionStatus status, Pageable pageable);
 }

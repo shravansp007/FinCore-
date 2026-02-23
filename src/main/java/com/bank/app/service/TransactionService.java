@@ -121,6 +121,15 @@ public class TransactionService {
     }
 
     @Transactional
+    public TransactionResponse processTransfer(String userEmail, TransactionRequest request) {
+        if (request == null || request.getType() == null || request.getType() != TransactionType.TRANSFER) {
+            throw new BadRequestException("Transfer endpoint only supports type TRANSFER");
+        }
+        User user = getUserByEmail(userEmail);
+        return transferInternal(user, request);
+    }
+
+    @Transactional
     public TransactionResponse deposit(String userEmail, AccountOperationRequest request) {
         User user = getUserByEmail(userEmail);
         Account account = getUserAccount(user, request.getAccountId());

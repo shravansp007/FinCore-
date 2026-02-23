@@ -12,7 +12,7 @@ import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
-@RequestMapping("/api/profile")
+@RequestMapping({"/api/v1/profile", "/api/profile"})
 @RequiredArgsConstructor
 public class ProfileController {
 

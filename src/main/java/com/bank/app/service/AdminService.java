@@ -1,13 +1,20 @@
 package com.bank.app.service;
 
 import com.bank.app.dto.AccountDTO;
+import com.bank.app.dto.FraudAlertResponse;
+import com.bank.app.dto.FraudAlertReviewRequest;
+import com.bank.app.dto.FraudRuleConfigRequest;
+import com.bank.app.dto.FraudRuleConfigResponse;
 import com.bank.app.dto.TransactionResponse;
 import com.bank.app.dto.UserSummaryDTO;
 import com.bank.app.entity.Account;
+import com.bank.app.entity.FraudAlert;
+import com.bank.app.entity.FraudRuleConfig;
 import com.bank.app.entity.Transaction;
 import com.bank.app.entity.User;
 import com.bank.app.exception.ResourceNotFoundException;
 import com.bank.app.repository.AccountRepository;
+import com.bank.app.repository.FraudAlertRepository;
 import com.bank.app.repository.TransactionRepository;
 import com.bank.app.repository.UserRepository;
 import lombok.RequiredArgsConstructor;
@@ -17,6 +24,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.lang.NonNull;
 import org.springframework.stereotype.Service;
 
+import java.math.BigDecimal;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -28,6 +36,9 @@ public class AdminService {
     private final UserRepository userRepository;
     private final AccountRepository accountRepository;
     private final TransactionRepository transactionRepository;
+    private final FraudAlertRepository fraudAlertRepository;
+    private final AuthService authService;
+    private final FraudDetectionService fraudDetectionService;
 
     public List<UserSummaryDTO> getAllUsers() {
         return userRepository.findAll().stream()
@@ -53,6 +64,41 @@ public class AdminService {
         account = accountRepository.save(account);
         log.info("action=admin.account.status_change accountId={} active={}", account.getId(), account.getActive());
         return mapAccountToDTO(account);
+    }
+
+    public void unlockAccount(Long userId) {
+        authService.unlockUserAccount(userId);
+        log.info("action=admin.user.unlock userId={}", userId);
+    }
+
+    public FraudRuleConfigResponse getFraudRuleConfig() {
+        BigDecimal threshold = fraudDetectionService.getAmountThreshold();
+        FraudRuleConfig config = FraudRuleConfig.builder()
+                .ruleName(FraudRuleConfig.AMOUNT_THRESHOLD_RULE)
+                .thresholdValue(threshold)
+                .build();
+        return mapRuleConfig(config);
+    }
+
+    public FraudRuleConfigResponse updateFraudRuleConfig(FraudRuleConfigRequest request) {
+        FraudRuleConfig updated = fraudDetectionService.updateAmountThreshold(request.getThresholdAmount());
+        return mapRuleConfig(updated);
+    }
+
+    public List<FraudAlertResponse> getFraudAlerts() {
+        return fraudAlertRepository.findAll().stream()
+                .map(this::mapFraudAlert)
+                .collect(Collectors.toList());
+    }
+
+    public FraudAlertResponse reviewFraudAlert(Long alertId, FraudAlertReviewRequest request, String reviewerEmail) {
+        FraudAlert alert = fraudAlertRepository.findById(alertId)
+                .orElseThrow(() -> new ResourceNotFoundException("Fraud alert not found"));
+        alert.setStatus(request.getStatus());
+        alert.setReviewedBy(reviewerEmail);
+        alert.setReviewedAt(java.time.LocalDateTime.now());
+        alert = fraudAlertRepository.save(alert);
+        return mapFraudAlert(alert);
     }
 
     private UserSummaryDTO mapUserToSummary(User user) {
@@ -91,6 +137,28 @@ public class AdminService {
                 .destinationAccountNumber(t.getDestinationAccount() != null ? t.getDestinationAccount().getAccountNumber() : null)
                 .status(t.getStatus())
                 .transactionDate(t.getTransactionDate())
+                .build();
+    }
+
+    private FraudRuleConfigResponse mapRuleConfig(FraudRuleConfig config) {
+        return FraudRuleConfigResponse.builder()
+                .ruleName(config.getRuleName())
+                .thresholdAmount(config.getThresholdValue())
+                .updatedAt(config.getUpdatedAt())
+                .build();
+    }
+
+    private FraudAlertResponse mapFraudAlert(FraudAlert alert) {
+        return FraudAlertResponse.builder()
+                .id(alert.getId())
+                .transactionId(alert.getTransactionId())
+                .accountId(alert.getAccountId())
+                .riskScore(alert.getRiskScore())
+                .triggeredRules(alert.getTriggeredRules())
+                .status(alert.getStatus())
+                .reviewedBy(alert.getReviewedBy())
+                .reviewedAt(alert.getReviewedAt())
+                .createdAt(alert.getCreatedAt())
                 .build();
     }
 }
